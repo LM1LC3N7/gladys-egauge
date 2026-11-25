@@ -90,3 +90,7 @@
   ENERGY_MAX for a counter) are not published (review r1, M4).
 - Retries of an unreachable meter capped at 5 min (review r1, M7).
 - Token used again for 8 minutes (the meter gives about 10).
+
+## Next patch
+
+- Review minors: see `_lots/lot25/reviews/egauge-r3.md` (m1 textes de l ancienne règle et statut noIdentity, m2 n° de série redemandé à chaque lecture sur 200+error).
