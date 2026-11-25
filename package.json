@@ -1,6 +1,6 @@
 {
   "name": "gladys-egauge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "eGauge energy meters for Gladys Assistant, through the official local WebAPI: power and energy of every register (circuits, solar, grid), read-only.",
   "type": "module",

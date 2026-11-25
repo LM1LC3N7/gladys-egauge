@@ -10,6 +10,8 @@ the notes of the version's GitHub Release.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-25
+
 ### Added
 
 - eGauge energy meters through the official local WebAPI (HTTPS): one device
@@ -28,3 +30,6 @@ the notes of the version's GitHub Release.
 - Read-only: `/api/cmd` and `/api/config` are never called.
 - An account without the "View settings" right works: the meter is then
   identified by its confirmed certificate.
+
+[Unreleased]: https://github.com/LM1LC3N7/gladys-egauge/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/LM1LC3N7/gladys-egauge/releases/tag/v0.1.1
