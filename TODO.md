@@ -18,7 +18,8 @@
       one range, one row, the values in increasing register index (as the
       documentation and egauge-python say); `raw` with `virtual=value`.
 - [ ] `/api/sys/sn` needs the `view_settings` right (WebAPI). Refused
-      (401/403 right after a login): the registers are read all the same,
+      (401/403 right after a login, or a 200 with `error`, or no readable
+      serial number, review r2): the registers are read all the same,
       the meter identified by the confirmed certificate (review r1, B1,
       option b); the serial number asked again at each new token only.
       To confirm: the status a real meter gives for that refusal.

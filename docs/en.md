@@ -122,10 +122,12 @@ published nor held: the last value stays until it rises again.
 
 At every read, the integration reads the serial number of the meter and
 compares it with the one of the first read (a salted hash in `/data`, never
-the number). An account without the "View settings" right may not read
-that number: its registers are read all the same, and the meter is then
+the number). If that number cannot be read (an account without the "View
+settings" right: the WebAPI refuses it with a 401 or an error in its
+answer), the registers are read all the same, and the meter is then
 identified by the certificate you confirmed (the status says so); a new
-certificate trusted then counts as "another meter" until your two clicks.
+certificate trusted then counts as "another meter" until your two clicks,
+even when the serial number becomes readable.
 Another meter at the address: nothing is published until you
 accept it (two clicks on **Accept the held values**), so that its counters
 are never mixed with the first one's.

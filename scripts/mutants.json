@@ -220,5 +220,35 @@
     "file": "src/devices.js",
     "from": "    if (value < (entry.spec.min ?? 0) || value > entry.spec.max) continue;",
     "to": ""
+  },
+  {
+    "name": "unreadable serial number: no certificate fallback",
+    "file": "src/app.js",
+    "from": "    if (serialRefused || !serial) {",
+    "to": "    if (serialRefused) {\n      this.identityState = 'unreadable';\n      return;\n    }\n    if (!serial) {\n      this.identityState = 'unreadable';\n      return;\n    }\n    if (false) {"
+  },
+  {
+    "name": "serial learned blindly when only the certificate is known",
+    "file": "src/app.js",
+    "from": "    if (!m.identity && m.identityPin && pinSeen && m.identityPin !== pinSeen) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "counter above ENERGY_MAX published",
+    "file": "src/app.js",
+    "from": "                sample.counter <= ENERGY_MAX,",
+    "to": "                true,"
+  },
+  {
+    "name": "retries up to 30 min",
+    "file": "src/constants.js",
+    "from": "export const RETRY_MAX = 5 * MINUTE;",
+    "to": "export const RETRY_MAX = 30 * MINUTE;"
+  },
+  {
+    "name": "another meter said by serial number when it is the certificate",
+    "file": "src/app.js",
+    "from": "this.otherIdentity?.field === 'identityPin'",
+    "to": "false"
   }
 ]

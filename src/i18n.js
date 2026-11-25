@@ -187,11 +187,11 @@ export const T = {
       },
       notes,
     ),
-  otherMeter: (address, notes) =>
+  otherMeter: (address, byCertificate, notes) =>
     withNotes(
       {
-        en: `Another eGauge meter answers at ${address} (another serial number): nothing is published, so that its counters are never mixed with the first one's. If you replaced the meter, click "Accept the held values" twice.`,
-        fr: `Un autre compteur eGauge répond à ${address} (autre numéro de série) : rien n’est publié, pour ne jamais mêler ses compteurs à ceux du premier. Si vous avez remplacé le compteur, cliquez deux fois sur « Accepter les valeurs retenues ».`,
+        en: `Another eGauge meter answers at ${address} (${byCertificate ? 'another certificate' : 'another serial number'}): nothing is published, so that its counters are never mixed with the first one's. If you replaced the meter, click "Accept the held values" twice.`,
+        fr: `Un autre compteur eGauge répond à ${address} (${byCertificate ? 'autre certificat' : 'autre numéro de série'}) : rien n’est publié, pour ne jamais mêler ses compteurs à ceux du premier. Si vous avez remplacé le compteur, cliquez deux fois sur « Accepter les valeurs retenues ».`,
       },
       notes,
     ),
@@ -255,8 +255,8 @@ export const T = {
       fr: `Listé(s) mais compté(s) nulle part (pas un registre de puissance, ou pas d’énergie cumulée au-dessus de 0 : pince inversée, registre net qui exporte ?) : ${names(list)}.`,
     }),
     byCertificate: {
-      en: 'This account may not read the serial number of the meter (no "view settings" right): the meter is identified by the certificate you confirmed.',
-      fr: 'Ce compte ne peut pas lire le numéro de série du compteur (pas de droit « view settings ») : le compteur est identifié par le certificat que vous avez confirmé.',
+      en: 'The serial number of the meter cannot be read (an account without the "view settings" right?): the meter is identified by the certificate you confirmed.',
+      fr: 'Le numéro de série du compteur ne peut pas être lu (un compte sans le droit « view settings » ?) : le compteur est identifié par le certificat que vous avez confirmé.',
     },
     stale: {
       en: 'The latest row of the meter is more than 2 hours old: not published.',

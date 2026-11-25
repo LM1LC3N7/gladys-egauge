@@ -809,8 +809,10 @@ export class EgaugeApp {
     }
     const pin = this.trusted();
     const pinSeen = pin ? hmac(m.salt, `certificate:${pin}`) : undefined;
-    if (serialRefused) {
-      // The fallback: the certificate the user confirmed (a new one is never
+    if (serialRefused || !serial) {
+      // The fallback, the serial number refused (401/403, an account without
+      // `view_settings`) or unreadable (a 200 with an `error`, as the WebAPI
+      // documents it): the certificate the user confirmed (a new one is never
       // taken without the user, and another one here is another meter).
       this.identityBy = 'certificate';
       if (!pinSeen) {
@@ -821,9 +823,11 @@ export class EgaugeApp {
       return;
     }
     this.identityBy = 'serial';
-    if (!serial) {
-      // The meter did not say: nothing published from this read.
-      this.identityState = 'unreadable';
+    if (!m.identity && m.identityPin && pinSeen && m.identityPin !== pinSeen) {
+      // Only the certificate is known (a read-only account read it): another
+      // certificate is another meter, never a serial number learned blindly.
+      this.identityBy = 'certificate';
+      await this.matchIdentity('identityPin', pinSeen);
       return;
     }
     await this.matchIdentity('identity', hmac(m.salt, serial));
@@ -1382,7 +1386,9 @@ export class EgaugeApp {
       return [false, T.unreachable(address, this.lastError, wait, notes)];
     }
     if (this.outcome?.kind === 'reading') {
-      if (this.identityState === 'other') return [false, T.otherMeter(address, notes)];
+      if (this.identityState === 'other') {
+        return [false, T.otherMeter(address, this.otherIdentity?.field === 'identityPin', notes)];
+      }
       if (this.identityState === 'unreadable') return [false, T.noIdentity(address, notes)];
       const extra = [];
       if (this.outcome.unsupported > 0) extra.push(T.notes.unsupported(this.outcome.unsupported));

@@ -127,11 +127,13 @@ ni publié ni retenu : la dernière valeur reste jusqu'à ce qu'il remonte.
 
 À chaque lecture, l'intégration lit le numéro de série du compteur et le
 compare à celui de la première lecture (une empreinte salée dans `/data`,
-jamais le numéro). Un compte sans le droit « View settings » ne peut pas lire
-ce numéro : ses registres sont lus quand même, et le compteur est alors
+jamais le numéro). Si ce numéro ne peut pas être lu (un compte sans le droit
+« View settings » : la WebAPI le refuse par un 401 ou par une erreur dans sa
+réponse), les registres sont lus quand même, et le compteur est alors
 identifié par le certificat que vous avez confirmé (le statut le dit) ; un
 nouveau certificat accepté vaut alors « autre compteur » jusqu'à vos deux
-clics. Un autre compteur à l'adresse : plus rien n'est publié
+clics. Quand seul le certificat est connu, un nouveau certificat vaut aussi
+« autre compteur », même si le numéro de série devient lisible. Un autre compteur à l'adresse : plus rien n'est publié
 tant que vous ne l'acceptez pas (deux clics sur **Accepter les valeurs
 retenues**), pour ne jamais mêler ses compteurs à ceux du premier.
 

@@ -149,8 +149,14 @@ export function createMeter({
     const bearer = /^Bearer (.+)$/.exec(String(headers.authorization ?? ''))?.[1];
     if (!bearer || !meter.tokens.has(bearer)) return challenge();
     if (path === '/api/sys/sn' && method === 'GET') {
-      // `/sys` needs the `view_settings` privilege (WebAPI).
-      if (!meter.viewSettings) return json(403, { error: 'Insufficient privileges.' }, date);
+      // `/sys` needs the `view_settings` privilege (WebAPI). The refusal in
+      // the two documented shapes (a 200 with `error`, a 401) and a 403.
+      if (!meter.viewSettings) {
+        if (meter.snRefusal === '200')
+          return json(200, { error: 'Insufficient privileges.' }, date);
+        if (meter.snRefusal === '401') return challenge();
+        return json(403, { error: 'Insufficient privileges.' }, date);
+      }
       return json(200, { result: meter.serial }, date);
     }
     if (path === '/api/register?raw&rate&virtual=value&time=now' && method === 'GET') {

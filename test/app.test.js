@@ -445,12 +445,12 @@ test('another meter at the address: nothing published until accepted in two clic
   await t.app.stop();
 });
 
-test('a serial number that cannot be read: nothing published from that read, never "another meter"', async () => {
+test('a serial number that cannot be read: the certificate identifies the meter, never "another meter"', async () => {
   const t = await setup({ devices: [created(GRID)] });
   t.meter.hook = (path) => (path === PATHS.SERIAL ? json(200, { result: '' }) : undefined);
   await t.start();
-  assert.deepEqual(t.statesOf(GRID, 'power'), []);
-  assert.match(text(t.gladys.fake.connectionStatus), /serial number could not be checked/);
+  assert.deepEqual(t.statesOf(GRID, 'power'), [-698]);
+  assert.match(text(t.gladys.fake.connectionStatus), /identified by the certificate/);
   assert.equal(t.store.data.identity, null);
   await t.app.stop();
 });
@@ -687,5 +687,78 @@ test('300 registers: at most 250 states a minute; badges in calls of 100, tried 
   await t.wait(2 * POLL_INTERVAL);
   assert.ok(powers() > 250);
   assert.equal(new Set(t.gladys.fake.transports.map((b) => b.device_external_id)).size, 300);
+  await t.app.stop();
+});
+
+// --- Review r2 -------------------------------------------------------------------------------------
+
+for (const shape of ['200', '401', '403']) {
+  test(`/api/sys/sn refused (${shape}): the registers published, the meter identified by its certificate`, async () => {
+    const t = await setup({ devices: [created(GRID)] });
+    t.meter.viewSettings = false;
+    t.meter.snRefusal = shape;
+    await t.start();
+    assert.deepEqual(t.statesOf(GRID, 'power'), [-698]);
+    assert.equal(t.gladys.fake.connectionStatus.connected, true);
+    assert.match(text(t.gladys.fake.connectionStatus), /identified by the certificate/);
+    assert.match(t.store.data.identityPin, /^[0-9a-f]{64}$/);
+    assert.equal(t.app.memory.refused, undefined);
+    t.meter.reg('Grid').rate = -1;
+    await t.wait(POLL_INTERVAL);
+    assert.equal(t.statesOf(GRID, 'power').at(-1), -1);
+    await t.app.stop();
+  });
+}
+
+test('only the certificate known: another certificate with a readable serial number is another meter', async () => {
+  const store = createMemoryStore();
+  const t = await setup({ devices: [created(GRID)], store });
+  t.meter.viewSettings = false;
+  await t.start();
+  assert.equal(t.store.data.identity, null);
+  // Meter B: another certificate (trusted by the user), another serial number, an account with the right.
+  t.meter.viewSettings = true;
+  t.meter.serial = 'G77777';
+  t.meter.fingerprint = OTHER_FP;
+  t.meter.reg('Grid').rate = 42;
+  await t.app.configUpdated({ ...TRUSTED, certificate_fingerprint: OTHER_FP });
+  await t.wait(POLL_INTERVAL);
+  assert.deepEqual(t.statesOf(GRID, 'power'), [-698], 'nothing of B on the devices of A');
+  assert.equal(t.store.data.identity, null, 'no serial number learned blindly');
+  assert.match(text(t.gladys.fake.connectionStatus), /another certificate/);
+  await t.app.acceptHeld();
+  await t.advance(4 * SECOND);
+  assert.match((await t.app.acceptHeld()).en, /New meter accepted/);
+  await t.wait(POLL_INTERVAL);
+  assert.equal(t.statesOf(GRID, 'power').at(-1), 42);
+  assert.match(t.store.data.identity, /^[0-9a-f]{64}$/, 'then its serial number is learned');
+  await t.app.stop();
+});
+
+test('a lifetime value above ENERGY_MAX is never published, even as a first value', async () => {
+  const t = await setup({ devices: [created(SOLAR_PLUS)] });
+  t.meter.reg('Solar+').cumul = ws(2e10);
+  await t.start();
+  assert.deepEqual(t.statesOf(SOLAR_PLUS, 'lifetime'), []);
+  await t.app.stop();
+});
+
+test('an unreachable meter: tried again after 30 s doubled, never more than 5 minutes apart', async () => {
+  const t = await setup();
+  t.meter.hook = (path) => {
+    if (path === PATHS.UNAUTHORIZED) throw Object.assign(new Error('x'), { code: 'unreachable' });
+    return undefined;
+  };
+  await t.start();
+  const at = () => t.meter.requests.filter((r) => r.path === PATHS.UNAUTHORIZED).map((r) => r.at);
+  await t.wait(2 * HOUR);
+  const times = at();
+  const gaps = times.slice(1).map((v, i) => v - times[i]);
+  const expected = [30 * SECOND, MINUTE, 2 * MINUTE, 4 * MINUTE, 5 * MINUTE, 5 * MINUTE];
+  expected.forEach((g, i) => assert.ok(Math.abs(gaps[i] - g) < SECOND, gaps.join(',')));
+  assert.ok(
+    gaps.every((g) => g <= 5 * MINUTE + SECOND),
+    gaps.join(','),
+  );
   await t.app.stop();
 });
