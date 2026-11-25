@@ -7,7 +7,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeConfig, parseHost, parseRegisterList } from '../src/config.js';
 import { accumulationOf, kwhOf, platformIdOf, sampleOf } from '../src/devices.js';
-import { digestHash } from '../src/egauge/client.js';
+import { EgaugeClient, digestHash } from '../src/egauge/client.js';
+import { PATHS, REGISTER_BYTES, REQUEST_TIMEOUT } from '../src/constants.js';
 import {
   challengeOf,
   cumulOf,
@@ -52,6 +53,7 @@ test('the register answer: refused when it is not one of the WebAPI', () => {
   const bad = [
     'not json',
     { error: 'denied' },
+    { ...good, error: 'Too many registers' },
     { registers: 'x' },
     { ...good, ranges: [] },
     { ...good, ranges: [{ ts: '1', rows: [['1']] }] },
@@ -165,4 +167,29 @@ test('the guard never takes 0 nor a negative value, even as a first value', () =
   assert.equal(guard.accept(0, 0), false);
   assert.equal(guard.accept(-1, 0), false);
   assert.equal(guard.accept(5, 0), true);
+});
+
+test('the client: every request bounded in time (15 s) and in size', async () => {
+  const meter = createMeter();
+  const seen = [];
+  const client = new EgaugeClient({
+    host: '192.168.1.30',
+    port: 443,
+    username: 'reader',
+    password: 'S3cret-pass!',
+    checkPeer: () => {},
+    request: (target, options) => {
+      seen.push({ path: target.path, timeout: options.timeout, maxBytes: options.maxBytes });
+      return meter.request(target, options);
+    },
+  });
+  await client.readSerial({ timeout: 600_000 });
+  await client.readRegisters();
+  assert.equal(REQUEST_TIMEOUT, 15_000);
+  for (const r of seen) {
+    assert.ok(r.timeout <= 15_000, `${r.path} ${r.timeout}`);
+    assert.ok(r.maxBytes <= 1024 * 1024, `${r.path} ${r.maxBytes}`);
+  }
+  assert.equal(seen.find((r) => r.path === PATHS.REGISTERS).maxBytes, REGISTER_BYTES);
+  assert.ok(REGISTER_BYTES <= 1024 * 1024);
 });

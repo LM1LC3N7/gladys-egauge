@@ -409,6 +409,8 @@ export function liveStates(gladys, sample) {
     let value = sample[entry.value];
     if (!isNumber(value)) continue;
     if (entry.floor !== undefined) value = Math.max(entry.floor, value);
+    // Outside the bounds declared to Gladys: not a measure, never sent.
+    if (value < (entry.spec.min ?? 0) || value > entry.spec.max) continue;
     states.push({
       device_feature_external_id: external.feature(entry.key),
       state: round(value, entry.digits),

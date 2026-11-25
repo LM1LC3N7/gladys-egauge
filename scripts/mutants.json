@@ -80,7 +80,7 @@
   {
     "name": "another meter taken as the same",
     "file": "src/app.js",
-    "from": "    if (m.identity === seen) {",
+    "from": "    if (m[field] === seen) {",
     "to": "    if (true) {"
   },
   {
@@ -142,5 +142,83 @@
     "file": "src/guard.js",
     "from": "if (!Number.isFinite(value) || value <= 0) {",
     "to": "if (!Number.isFinite(value) || value < 0) {"
+  },
+  {
+    "name": "request deadline not clamped",
+    "file": "src/egauge/client.js",
+    "from": "Math.min(timeout ?? REQUEST_TIMEOUT, REQUEST_TIMEOUT)",
+    "to": "timeout ?? 600_000"
+  },
+  {
+    "name": "register answer cap x1024",
+    "file": "src/constants.js",
+    "from": "export const REGISTER_BYTES = 1024 * 1024;",
+    "to": "export const REGISTER_BYTES = 1024 * 1024 * 1024;"
+  },
+  {
+    "name": "no budget of states",
+    "file": "src/app.js",
+    "from": "if (values.length + due.length > left) break;",
+    "to": ""
+  },
+  {
+    "name": "time of the read not saved before it",
+    "file": "src/app.js",
+    "from": "    this.lastAttemptAt = this.now();\n    await this.saveState();",
+    "to": "    this.lastAttemptAt = this.now();"
+  },
+  {
+    "name": "published states not forgotten at a start",
+    "file": "src/app.js",
+    "from": "    this.gladys.forgetPublishedStates?.();",
+    "to": ""
+  },
+  {
+    "name": "read() ignores the refusal",
+    "file": "src/app.js",
+    "from": "    if (!evenRefused && this.refusedApplies()) return;",
+    "to": ""
+  },
+  {
+    "name": "small drop ignored for any register",
+    "file": "src/app.js",
+    "from": "      sample.accumulation === 'net' &&\n",
+    "to": ""
+  },
+  {
+    "name": "token kept 60 min",
+    "file": "src/constants.js",
+    "from": "export const TOKEN_MAX_AGE = 8 * 60 * 1000;",
+    "to": "export const TOKEN_MAX_AGE = 60 * 60 * 1000;"
+  },
+  {
+    "name": "error member of a register answer ignored",
+    "file": "src/egauge/model.js",
+    "from": "  if (typeof json.error === 'string') {\n    // The text of the meter is never quoted.",
+    "to": "  if (false) {\n    // The text of the meter is never quoted."
+  },
+  {
+    "name": "badges in one call",
+    "file": "src/app.js",
+    "from": "const BADGES_PER_CALL = 100;",
+    "to": "const BADGES_PER_CALL = 1000;"
+  },
+  {
+    "name": "serial refused fails the read",
+    "file": "src/app.js",
+    "from": "        if (err?.code !== CODES.ACCESS) throw err;",
+    "to": "        throw err;"
+  },
+  {
+    "name": "401 nonce expired taken as refusal",
+    "file": "src/egauge/client.js",
+    "from": "        if (expired) continue;",
+    "to": ""
+  },
+  {
+    "name": "values out of bounds published",
+    "file": "src/devices.js",
+    "from": "    if (value < (entry.spec.min ?? 0) || value > entry.spec.max) continue;",
+    "to": ""
   }
 ]

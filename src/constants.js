@@ -76,9 +76,9 @@ const HOUR = 60 * MINUTE;
 export const POLL_INTERVAL = 30 * SECOND;
 /** The lifetime counters: once a minute at most. */
 export const INDEX_INTERVAL = MINUTE;
-/** An unreachable meter or a wrong answer: tries after 30 s, doubled up to 30 minutes. */
+/** An unreachable meter or a wrong answer: tries after 30 s, doubled up to 5 minutes (a LAN device). */
 export const RETRY_MIN = 30 * SECOND;
-export const RETRY_MAX = 30 * MINUTE;
+export const RETRY_MAX = 5 * MINUTE;
 /** HTTP 429 or 5xx: a pause from 1 min to 6 h, kept in /data. */
 export const PAUSE_MIN = MINUTE;
 export const PAUSE_MAX = 6 * HOUR;

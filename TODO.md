@@ -17,9 +17,11 @@
 - [ ] `/api/register?raw&rate&virtual=value&time=now` on the firmwares met:
       one range, one row, the values in increasing register index (as the
       documentation and egauge-python say); `raw` with `virtual=value`.
-- [ ] Whether `/api/sys/sn` needs the `view_settings` right: a read-only
-      account without it would leave the identity unreadable (nothing
-      published, the status says so).
+- [ ] `/api/sys/sn` needs the `view_settings` right (WebAPI). Refused
+      (401/403 right after a login): the registers are read all the same,
+      the meter identified by the confirmed certificate (review r1, B1,
+      option b); the serial number asked again at each new token only.
+      To confirm: the status a real meter gives for that refusal.
 - [ ] The register name suffixes (`+`, `-`, `|`) mean what they say for
       locally calculated registers only (WebAPI glossary); a remote register
       (Modbus...) ending with one may be net. Its lifetime energy is guarded
@@ -78,5 +80,12 @@
 - Values from `raw` (counted from the creation of the database): a new
   epoch set in the meter never makes them drop.
 - Identity: the serial number at every read (`/api/sys/sn`, one small
-  request), a salted HMAC in /data.
+  request), a salted HMAC in /data; with it, an HMAC of the confirmed
+  certificate. An account without `view_settings` (the read-only account the
+  docs advise): the certificate is the identity (review r1, B1, decided by
+  the coordinator: option b); a certificate trusted again then needs
+  "Accept the held values".
+- Values outside the bounds declared to Gladys (min/max of each feature,
+  ENERGY_MAX for a counter) are not published (review r1, M4).
+- Retries of an unreachable meter capped at 5 min (review r1, M7).
 - Token used again for 8 minutes (the meter gives about 10).

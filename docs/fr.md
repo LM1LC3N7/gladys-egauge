@@ -17,7 +17,9 @@ partir d'elles.
 - Un compteur eGauge sur votre réseau, joignable depuis Gladys en HTTPS
   (port 443 par défaut) ;
 - un compte du compteur (Settings > Access Control dans son interface web).
-  Un compte qui peut seulement voir les données suffit : créez-en un pour
+  Un compte qui peut seulement voir les données suffit (sans le droit
+  « View settings », le compteur est identifié par son certificat, voir
+  « Identité ») : créez-en un pour
   Gladys plutôt que de donner le compte propriétaire.
 
 ## Configuration
@@ -80,6 +82,11 @@ Un appareil par registre d'un type pris en charge, lu toutes les 30 secondes :
 - **Tension** (V), **courant** (A), **fréquence** (Hz) et **température**
   (°C) des registres de ces types.
 
+Une valeur hors des bornes déclarées à Gladys (puissance au-delà de
+±10 MW, température hors de −100 à 1000 °C...) n'est pas une mesure : elle
+n'est pas publiée. Un registre listé qui ne compte rien (pas de puissance,
+ou énergie cumulée nulle ou négative) est signalé dans le statut.
+
 Les autres types (humidité, débit, irradiance...) ne sont pas proposés (le
 statut les compte).
 
@@ -120,7 +127,11 @@ ni publié ni retenu : la dernière valeur reste jusqu'à ce qu'il remonte.
 
 À chaque lecture, l'intégration lit le numéro de série du compteur et le
 compare à celui de la première lecture (une empreinte salée dans `/data`,
-jamais le numéro). Un autre compteur à l'adresse : plus rien n'est publié
+jamais le numéro). Un compte sans le droit « View settings » ne peut pas lire
+ce numéro : ses registres sont lus quand même, et le compteur est alors
+identifié par le certificat que vous avez confirmé (le statut le dit) ; un
+nouveau certificat accepté vaut alors « autre compteur » jusqu'à vos deux
+clics. Un autre compteur à l'adresse : plus rien n'est publié
 tant que vous ne l'acceptez pas (deux clics sur **Accepter les valeurs
 retenues**), pour ne jamais mêler ses compteurs à ceux du premier.
 
@@ -143,13 +154,15 @@ retenues**), pour ne jamais mêler ses compteurs à ceux du premier.
   lectures sont en pause, de 1 minute à 6 heures (ou ce que le compteur
   demande), gardée au redémarrage.
 - **Le compteur ne répond plus** : nouvel essai après 30 secondes, doublé
-  jusqu'à 30 minutes.
+  jusqu'à 5 minutes.
 - **La dernière ligne du compteur a plus de 2 heures** (horloge du compteur,
   son en-tête `Date`) : rien n'est publié.
-- **`/data` ne peut pas être lu** : aucun compteur cumulé n'est publié, le
-  bouton ne peut pas faire confiance à un certificat (saisissez l'empreinte),
-  le fichier n'est jamais écrasé. **`/data` ne peut pas être écrit** : les
-  compteurs cumulés sont retenus.
+- **`/data` ne peut pas être lu** : rien n'est publié ni proposé (le
+  compteur ne peut pas être identifié), le bouton ne peut pas faire
+  confiance à un certificat (saisissez l'empreinte), le fichier n'est jamais
+  écrasé. **`/data` ne peut pas être écrit** : les compteurs cumulés sont
+  retenus, et rien n'est publié tant que l'identité du compteur n'y est pas
+  gardée (première lecture).
 
 Gladys reçoit au plus 250 valeurs par minute de l'intégration : avec beaucoup
 de registres, les appareils passent à tour de rôle.

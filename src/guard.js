@@ -1,10 +1,11 @@
 // -----------------------------------------------------------------------------
 // Plausibility of an energy index, the values Gladys counts. Pure.
 //
-// Taken as it is from gladys-p1-monitor (src/guard.js, approved), with one
-// change only: `maxKw` and `slackKwh` are parameters of the guard (each index
-// passes its own), no longer constants of the module. Same file as
-// gladys-zeversolar's and gladys-imeon's (approved): never changed alone.
+// Taken as it is from gladys-sunpower-pvs (src/guard.js, approved, the same
+// bytes), itself descended from the guard of gladys-p1-monitor with `maxKw`
+// and `slackKwh` as parameters of the guard (each index passes its own) and
+// the later review fixes. Never changed alone: the same change goes to
+// gladys-sunpower-pvs, with a review.
 //
 // The core turns the deltas of an `energy-sensor` / `index` feature (and of an
 // `energy-production-sensor` / `index`) into consumption, cost or production:

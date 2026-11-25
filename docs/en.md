@@ -16,7 +16,9 @@ documentation (webapi.egauge.net) and the maker's egauge-python library
 - An eGauge meter on your network, reachable from Gladys over HTTPS (port 443
   by default);
 - an account of the meter (Settings > Access Control in its web interface).
-  An account that may only view the data is enough: create one for Gladys
+  An account that may only view the data is enough (without the "View
+  settings" right, the meter is identified by its certificate, see
+  "Identity"): create one for Gladys
   rather than giving the owner account.
 
 ## Configuration
@@ -75,6 +77,11 @@ One device per register of a supported type, read every 30 seconds:
 - **Voltage** (V), **current** (A), **frequency** (Hz) and **temperature**
   (°C) of the registers of those types.
 
+A value outside the bounds declared to Gladys (a power beyond ±10 MW, a
+temperature outside −100 to 1000 °C...) is no measure: it is not published.
+A listed register that counts nothing (no power, or a lifetime energy at or
+below 0) is said in the status.
+
 Other types (humidity, flow, irradiance...) are not offered (the status
 counts them).
 
@@ -115,7 +122,11 @@ published nor held: the last value stays until it rises again.
 
 At every read, the integration reads the serial number of the meter and
 compares it with the one of the first read (a salted hash in `/data`, never
-the number). Another meter at the address: nothing is published until you
+the number). An account without the "View settings" right may not read
+that number: its registers are read all the same, and the meter is then
+identified by the certificate you confirmed (the status says so); a new
+certificate trusted then counts as "another meter" until your two clicks.
+Another meter at the address: nothing is published until you
 accept it (two clicks on **Accept the held values**), so that its counters
 are never mixed with the first one's.
 
@@ -137,13 +148,14 @@ are never mixed with the first one's.
   pause, from 1 minute to 6 hours (or what the meter asks), kept across a
   restart.
 - **The meter does not answer**: tried again after 30 seconds, doubled up to
-  30 minutes.
+  5 minutes.
 - **The latest row of the meter is more than 2 hours old** (the meter's
   clock, its `Date` header): nothing is published.
-- **`/data` cannot be read**: no lifetime counter is published, the button
-  cannot trust a certificate (type the fingerprint), the file is never
-  overwritten. **`/data` cannot be written**: the lifetime counters are held
-  back.
+- **`/data` cannot be read**: nothing is published nor offered (the meter
+  cannot be identified), the button cannot trust a certificate (type the
+  fingerprint), the file is never overwritten. **`/data` cannot be
+  written**: the lifetime counters are held back, and nothing is published
+  until the identity of the meter is kept there (first read).
 
 Gladys takes at most 250 values a minute from the integration: with many
 registers, the devices take turns.

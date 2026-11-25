@@ -19,7 +19,10 @@
 // opens a new one once in the same read; refused again right after a login,
 // it is CODES.ACCESS, never a refusal of the password. Only the login itself
 // refuses the password: HTTP 401/403 on /api/auth/login, or an `error` in its
-// answer other than an expired nonce (an expired nonce: one new try). Every
+// answer, other than an expired nonce (an expired nonce, in a 200 or a 401:
+// one new try). `/api/sys/sn` needs the `view_settings` right: refused, it
+// is CODES.ACCESS and the token is kept for the registers (src/app.js then
+// identifies the meter by its certificate). Every
 // request goes through `checkPeer` (src/egauge/http.js).
 // -----------------------------------------------------------------------------
 
@@ -63,6 +66,8 @@ export class EgaugeClient {
   /** The JWT of the open session, or null; `#tokenAt` its monotonic date. */
   #token = null;
   #tokenAt = 0;
+  /** The token with which `/api/sys/sn` was refused (an account without `view_settings`). */
+  #serialRefusedFor = null;
 
   /**
    * @param {object} options
@@ -161,6 +166,14 @@ export class EgaugeClient {
         timeout,
       });
       if (res.status === 401 || res.status === 403) {
+        // Its body first: an expired nonce is never a refused password.
+        let expired;
+        try {
+          expired = loginReplyOf(res.body).nonceExpired === true;
+        } catch {
+          expired = false;
+        }
+        if (expired) continue;
         throw new EgaugeError(CODES.CREDENTIALS, `Login refused (HTTP ${res.status})`, {
           status: res.status,
         });
@@ -192,7 +205,7 @@ export class EgaugeClient {
    * One GET on a token (a new one when none is or it is old; again once when
    * the meter refuses a token used before). Resolves `{ body, date }`.
    */
-  async get(path, { maxBytes = SMALL_BYTES, timeout } = {}) {
+  async get(path, { maxBytes = SMALL_BYTES, timeout, keepToken = false } = {}) {
     let fresh = false;
     if (!this.#tokenFresh()) {
       await this.login({ timeout });
@@ -208,7 +221,9 @@ export class EgaugeClient {
         continue;
       }
       if (refused) {
-        this.#token = null;
+        // A route that needs a right this account lacks: the token stays good for the others.
+        if (keepToken) this.#serialRefusedFor = this.#token;
+        else this.#token = null;
         throw new EgaugeError(CODES.ACCESS, `Refused after login (HTTP ${res.status})`, {
           status: res.status,
         });
@@ -220,7 +235,13 @@ export class EgaugeClient {
 
   /** The serial number of the meter, or undefined when the answer has none. */
   async readSerial(options) {
-    const { body } = await this.get(PATHS.SERIAL, options);
+    // Refused with this token already: not asked again until a new one (no login per read).
+    if (this.#token && this.#token === this.#serialRefusedFor && this.#tokenFresh()) {
+      throw new EgaugeError(CODES.ACCESS, 'Serial number refused to this account', {
+        status: 403,
+      });
+    }
+    const { body } = await this.get(PATHS.SERIAL, { ...options, keepToken: true });
     return serialOf(body);
   }
 

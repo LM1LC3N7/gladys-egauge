@@ -26,3 +26,5 @@ the notes of the version's GitHub Release.
 - The identity of the meter (its serial number, a salted hash in `/data`)
   checked at every read.
 - Read-only: `/api/cmd` and `/api/config` are never called.
+- An account without the "View settings" right works: the meter is then
+  identified by its confirmed certificate.

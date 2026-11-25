@@ -221,8 +221,8 @@ export const T = {
     ),
   notes: {
     storeUnreadable: (code) => ({
-      en: `/data cannot be read (${code}): no counter published, no certificate trusted by the button, until it reads again.`,
-      fr: `/data ne peut pas être lu (${code}) : aucun compteur publié, aucun certificat accepté par le bouton, jusqu’à ce qu’il se lise à nouveau.`,
+      en: `/data cannot be read (${code}): nothing published (the meter cannot be identified), no certificate trusted by the button, until it reads again.`,
+      fr: `/data ne peut pas être lu (${code}) : rien n’est publié (le compteur ne peut pas être identifié), aucun certificat accepté par le bouton, jusqu’à ce qu’il se lise à nouveau.`,
     }),
     saveFailed: {
       en: '/data cannot be written: the lifetime counters are held back.',
@@ -250,6 +250,14 @@ export const T = {
       en: `Listed but not found on the meter (check the exact names): ${names(list)}.`,
       fr: `Listé(s) mais introuvable(s) sur le compteur (vérifiez les noms exacts) : ${names(list)}.`,
     }),
+    uncounted: (list) => ({
+      en: `Listed but counted nowhere (not a power register, or no lifetime energy above 0: a reversed clamp, a net register that exports?): ${names(list)}.`,
+      fr: `Listé(s) mais compté(s) nulle part (pas un registre de puissance, ou pas d’énergie cumulée au-dessus de 0 : pince inversée, registre net qui exporte ?) : ${names(list)}.`,
+    }),
+    byCertificate: {
+      en: 'This account may not read the serial number of the meter (no "view settings" right): the meter is identified by the certificate you confirmed.',
+      fr: 'Ce compte ne peut pas lire le numéro de série du compteur (pas de droit « view settings ») : le compteur est identifié par le certificat que vous avez confirmé.',
+    },
     stale: {
       en: 'The latest row of the meter is more than 2 hours old: not published.',
       fr: 'La dernière ligne du compteur a plus de 2 heures : non publiée.',

@@ -81,7 +81,11 @@ test/helpers/server.js       the fake meter behind a real HTTPS server; a TLS im
   time of the last read is in /data before the request.
 - **Identity**: the serial number of every read against /data; another one:
   nothing published until `accept_held`; unreadable: nothing published from
-  that read.
+  that read. An account without `view_settings` (refused `/api/sys/sn`): the
+  registers are still read, the confirmed certificate is the identity
+  (`identityPin`), the serial number asked again with a new token only.
+- **Bounds**: a value outside the min/max declared to Gladys is not sent.
+- **Badges**: 100 per call (the SDK limit), kept as sent only once all went.
 - **Freshness**: a row is published once (its time in /data), never when it
   is more than 2 h older than the Date header of the meter.
 - **Late answers**: every await in a read is followed by `gone()`.

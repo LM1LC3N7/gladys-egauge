@@ -57,6 +57,7 @@ import {
   CONFIRM_AFTER,
   CONFIRM_WITHIN,
   DATED_AFTER,
+  ENERGY_MAX,
   INDEX_INTERVAL,
   NET_DROP_SLACK_KWH,
   PAUSE_MAX,
@@ -99,6 +100,8 @@ const finite = (value) => typeof value === 'number' && Number.isFinite(value);
 const isPlain = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const hmac = (salt, value) => createHmac('sha256', salt).update(value, 'utf8').digest('hex');
 const FP = /^([0-9A-F]{2}:){31}[0-9A-F]{2}$/;
+/** Badges per call (the SDK refuses more: MAX_TRANSPORTS_PER_REQUEST). */
+const BADGES_PER_CALL = 100;
 
 /**
  * The tag of a refused login: 8 bits of a salted hash of the user name and
@@ -140,6 +143,10 @@ export function readMemory(data) {
     certSeen: undefined,
     identity:
       typeof m.identity === 'string' && /^[0-9a-f]{64}$/.test(m.identity) ? m.identity : undefined,
+    identityPin:
+      typeof m.identityPin === 'string' && /^[0-9a-f]{64}$/.test(m.identityPin)
+        ? m.identityPin
+        : undefined,
     pause: undefined,
     refused: undefined,
     lastAttemptAt: finite(m.lastAttemptAt) ? m.lastAttemptAt : undefined,
@@ -316,6 +323,8 @@ export class EgaugeApp {
     /** The latest identity check: 'ok' | 'other' | 'unreadable' | undefined. */
     this.identityState = undefined;
     this.otherIdentity = undefined;
+    /** What identified the meter at the last read: 'serial' | 'certificate'. */
+    this.identityBy = undefined;
   }
 
   // --- Connection to Gladys -------------------------------------------------------
@@ -709,9 +718,18 @@ export class EgaugeApp {
     await this.saveState();
     if (gone()) return;
     let serial;
+    let serialRefused = false;
     let answer;
     try {
-      serial = await client.readSerial();
+      try {
+        serial = await client.readSerial();
+      } catch (err) {
+        // An account without the `view_settings` right may not read /api/sys/sn
+        // (WebAPI): its registers are read all the same, the meter identified
+        // by its certificate (checkIdentity).
+        if (err?.code !== CODES.ACCESS) throw err;
+        serialRefused = true;
+      }
       if (gone()) return;
       answer = await client.readRegisters();
     } catch (err) {
@@ -720,14 +738,14 @@ export class EgaugeApp {
       return;
     }
     if (gone()) return;
-    await this.succeeded(serial, answer, mono, gone);
+    await this.succeeded(serial, answer, mono, gone, serialRefused);
     if (gone()) return;
     await this.afterRead(mono, gone);
   }
 
   // --- Outcomes ----------------------------------------------------------------
 
-  async succeeded(serial, answer, mono, gone) {
+  async succeeded(serial, answer, mono, gone, serialRefused = false) {
     // An answer: a pause asked before, the retries, a refused login and a
     // certificate met are over.
     const m = this.memory;
@@ -751,6 +769,16 @@ export class EgaugeApp {
     const missing = [...this.config.consumption, ...this.config.production].filter(
       (n) => !names.has(n),
     );
+    // Listed, found, but nothing counted: not a power register, or no
+    // lifetime energy above 0 (a reversed clamp, a net grid that exports).
+    const counted = new Set(
+      samples
+        .filter((s) => s.role && finite(s.counter) && s.counter > 0 && s.counter <= ENERGY_MAX)
+        .map((s) => s.name),
+    );
+    const uncounted = [...this.config.consumption, ...this.config.production].filter(
+      (n) => names.has(n) && !counted.has(n),
+    );
     this.outcome = {
       at: mono,
       kind: 'reading',
@@ -759,8 +787,9 @@ export class EgaugeApp {
       samples,
       unsupported: unsupported + answer.skipped,
       missing,
+      uncounted,
     };
-    await this.checkIdentity(serial);
+    await this.checkIdentity(serial, serialRefused);
     if (gone()) return;
     await this.saveState();
   }
@@ -771,30 +800,63 @@ export class EgaugeApp {
    * another: nothing published until the user accepts it; unreadable: nothing
    * published from this read (never "another meter").
    */
-  async checkIdentity(serial) {
+  async checkIdentity(serial, serialRefused = false) {
     const m = this.memory;
-    if (!serial || this.storeError) {
-      // /data cannot tell which meter it was, or the meter did not say.
+    if (this.storeError) {
+      // /data cannot tell which meter it was.
       this.identityState = 'unreadable';
       return;
     }
-    const seen = hmac(m.salt, serial);
-    if (!m.identity) {
-      m.identity = seen;
-      this.identityState = (await this.saveState()) ? 'ok' : 'unreadable';
-      if (this.identityState !== 'ok') m.identity = undefined;
+    const pin = this.trusted();
+    const pinSeen = pin ? hmac(m.salt, `certificate:${pin}`) : undefined;
+    if (serialRefused) {
+      // The fallback: the certificate the user confirmed (a new one is never
+      // taken without the user, and another one here is another meter).
+      this.identityBy = 'certificate';
+      if (!pinSeen) {
+        this.identityState = 'unreadable';
+        return;
+      }
+      await this.matchIdentity('identityPin', pinSeen);
       return;
     }
-    if (m.identity === seen) {
+    this.identityBy = 'serial';
+    if (!serial) {
+      // The meter did not say: nothing published from this read.
+      this.identityState = 'unreadable';
+      return;
+    }
+    await this.matchIdentity('identity', hmac(m.salt, serial));
+    if (this.identityState === 'ok' && pinSeen && m.identityPin !== pinSeen) {
+      // The same meter by its serial number: its certificate is its fallback identity.
+      m.identityPin = pinSeen;
+      await this.saveState();
+    }
+  }
+
+  /**
+   * One identity (`field`: 'identity' the serial number, 'identityPin' the
+   * certificate) against /data: learned at the first read (saved before any
+   * value), the same: ok, another: nothing published until the user accepts.
+   */
+  async matchIdentity(field, seen) {
+    const m = this.memory;
+    if (!m[field]) {
+      m[field] = seen;
+      this.identityState = (await this.saveState()) ? 'ok' : 'unreadable';
+      if (this.identityState !== 'ok') m[field] = undefined;
+      return;
+    }
+    if (m[field] === seen) {
       this.identityState = 'ok';
       this.otherIdentity = undefined;
       return;
     }
-    if (this.otherIdentity !== seen) {
+    if (this.otherIdentity?.seen !== seen) {
       this.logger.warn('egauge: another meter answers at the address: nothing published');
     }
     this.identityState = 'other';
-    this.otherIdentity = seen;
+    this.otherIdentity = { field, seen };
   }
 
   /** After a read: Discovery when something new showed, the values, /data, the status. */
@@ -1032,7 +1094,11 @@ export class EgaugeApp {
       const due =
         (indexDue || recount) && !this.storeError
           ? countersOf(sample).filter(
-              (e) => features.has(e.key) && finite(sample.counter) && sample.counter > 0,
+              (e) =>
+                features.has(e.key) &&
+                finite(sample.counter) &&
+                sample.counter > 0 &&
+                sample.counter <= ENERGY_MAX,
             )
           : [];
       if (values.length === 0 && due.length === 0) continue;
@@ -1087,10 +1153,16 @@ export class EgaugeApp {
     }
     const key = JSON.stringify(badges);
     if (badges.length === 0 || key === this.lastBadges) return;
-    this.lastBadges = key;
-    await this.gladys
-      .publishTransports(badges)
-      .catch((err) => this.logger.warn(`Publishing the device badges failed (${err?.name})`));
+    // The SDK takes 100 badges a call at most; kept as sent only once all
+    // went, so that a failure is tried again at the next read.
+    try {
+      for (let i = 0; i < badges.length; i += BADGES_PER_CALL) {
+        await this.gladys.publishTransports(badges.slice(i, i + BADGES_PER_CALL));
+      }
+      this.lastBadges = key;
+    } catch (err) {
+      this.logger.warn(`Publishing the device badges failed (${err?.name})`);
+    }
   }
 
   // --- Devices -----------------------------------------------------------------------
@@ -1204,6 +1276,7 @@ export class EgaugeApp {
       pins: m.pins,
       certSeen: m.certSeen ?? null,
       identity: m.identity ?? null,
+      identityPin: m.identityPin ?? null,
       pause: p
         ? { key: p.key, until: p.until, count: p.count, code: p.code, status: p.status }
         : null,
@@ -1314,6 +1387,10 @@ export class EgaugeApp {
       const extra = [];
       if (this.outcome.unsupported > 0) extra.push(T.notes.unsupported(this.outcome.unsupported));
       if (this.outcome.missing.length > 0) extra.push(T.notes.missing(this.outcome.missing));
+      if (this.outcome.uncounted.length > 0) {
+        extra.push(T.notes.uncounted(this.outcome.uncounted));
+      }
+      if (this.identityBy === 'certificate') extra.push(T.notes.byCertificate);
       if (!this.fresh()) extra.push(T.notes.stale);
       const notCreated = this.knownPlatforms().filter(
         (p) => this.memory.seen[p] && !this.createdDevice(p),
@@ -1379,9 +1456,19 @@ export class EgaugeApp {
       }
     }
     let meterAccepted = false;
-    if (pending.other && pending.other === this.otherIdentity && this.identityState === 'other') {
-      const before = this.memory.identity;
-      this.memory.identity = pending.other;
+    const current = this.otherIdentity;
+    if (
+      pending.other &&
+      this.identityState === 'other' &&
+      pending.other.field === current?.field &&
+      pending.other.seen === current?.seen
+    ) {
+      const { field, seen } = pending.other;
+      const before = this.memory[field];
+      const beforePin = this.memory.identityPin;
+      this.memory[field] = seen;
+      // Another serial number: the certificate of before is not its fallback.
+      if (field === 'identity') this.memory.identityPin = undefined;
       if (await this.saveState()) {
         meterAccepted = true;
         this.identityState = undefined;
@@ -1389,7 +1476,8 @@ export class EgaugeApp {
         this.memory.samples = {};
         this.logger.info('egauge: the new meter accepted by the user');
       } else {
-        this.memory.identity = before;
+        this.memory[field] = before;
+        this.memory.identityPin = beforePin;
       }
     }
     if (accepted.length === 0 && changed.length === 0 && !meterAccepted) return T.accept.nothing;

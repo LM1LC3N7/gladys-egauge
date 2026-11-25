@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { INDEX_INTERVAL, PATHS, POLL_INTERVAL, TOKEN_MAX_AGE } from '../src/constants.js';
+import { INDEX_INTERVAL, PATHS, POLL_INTERVAL } from '../src/constants.js';
 import { platformIdOf } from '../src/devices.js';
 import { createMemoryStore } from '../src/store.js';
 import { FP, NOW, OTHER_FP, PASSWORD, SERIAL, USERNAME, json, ws } from './fixtures/meter.js';
@@ -141,8 +141,10 @@ test('the digest login: the password never sent, only the documented paths, the 
   assert.equal(t.meter.count(PATHS.LOGIN), 1, 'one login for three reads');
   assert.equal(t.meter.count('/api/register'), 3);
   assert.equal(t.meter.count('/api/sys/sn'), 3, 'identity at every read');
-  // After 8 minutes, a new token before it expires.
-  await t.wait(TOKEN_MAX_AGE);
+  // A new token after 8 minutes (the meter gives about 10), not sooner.
+  await t.wait(6 * MINUTE);
+  assert.equal(t.meter.count(PATHS.LOGIN), 1);
+  await t.wait(2 * MINUTE);
   assert.equal(t.meter.count(PATHS.LOGIN), 2);
   await t.app.stop();
 });
@@ -516,4 +518,174 @@ test('a slow meter: the test button answers within 25 s; nothing is read after a
   await t.wait(HOUR);
   assert.equal(t.meter.requests.length, count, 'nothing after the stop');
   assert.equal(t.pending.size, 0, 'no timer left');
+});
+
+// --- Review r1 -------------------------------------------------------------------------------------
+
+test('an account without "view settings": the registers are read, the meter identified by its certificate', async () => {
+  const t = await setup({ devices: [created(GRID)] });
+  t.meter.viewSettings = false;
+  await t.start();
+  assert.deepEqual(t.statesOf(GRID, 'power'), [-698]);
+  assert.equal(t.gladys.fake.connectionStatus.connected, true);
+  assert.match(text(t.gladys.fake.connectionStatus), /identified by the certificate/);
+  assert.equal(t.store.data.identity, null);
+  assert.match(t.store.data.identityPin, /^[0-9a-f]{64}$/);
+  assert.equal(t.app.memory.refused, undefined);
+  // No login per read: the serial number is asked again with a new token only.
+  t.meter.reg('Grid').rate = -500;
+  await t.wait(POLL_INTERVAL);
+  await t.wait(POLL_INTERVAL);
+  assert.equal(t.meter.count(PATHS.LOGIN), 1);
+  assert.equal(t.meter.count(PATHS.SERIAL), 1);
+  assert.equal(t.statesOf(GRID, 'power').at(-1), -500);
+  // Another certificate, typed by the user: another meter until accepted.
+  t.meter.fingerprint = OTHER_FP;
+  await t.app.configUpdated({ ...TRUSTED, certificate_fingerprint: OTHER_FP });
+  t.meter.reg('Grid').rate = -400;
+  await t.wait(POLL_INTERVAL);
+  assert.match(text(t.gladys.fake.connectionStatus), /Another eGauge meter/);
+  assert.equal(t.statesOf(GRID, 'power').at(-1), -500);
+  await t.app.acceptHeld();
+  await t.advance(4 * SECOND);
+  assert.match((await t.app.acceptHeld()).en, /New meter accepted/);
+  await t.wait(POLL_INTERVAL);
+  assert.equal(t.statesOf(GRID, 'power').at(-1), -400);
+  await t.app.stop();
+});
+
+test('a serial number read again: the certificate becomes its fallback identity', async () => {
+  const t = await setup({ devices: [created(GRID)] });
+  await t.start();
+  assert.match(t.store.data.identity, /^[0-9a-f]{64}$/);
+  assert.match(t.store.data.identityPin, /^[0-9a-f]{64}$/);
+  t.meter.viewSettings = false;
+  t.meter.reg('Grid').rate = 1;
+  await t.wait(POLL_INTERVAL);
+  assert.equal(t.statesOf(GRID, 'power').at(-1), 1, 'same certificate: the same meter');
+  await t.app.stop();
+});
+
+test('a 401 of the login with an expired nonce is a new try, never a refused password', async () => {
+  const t = await setup();
+  let once = true;
+  t.meter.hook = (path) => {
+    if (path === PATHS.LOGIN && once) {
+      once = false;
+      return json(401, { error: 'Nonce expired.' });
+    }
+    return undefined;
+  };
+  await t.start();
+  assert.equal(t.app.memory.refused, undefined);
+  assert.equal(t.meter.count(PATHS.UNAUTHORIZED), 2);
+  assert.equal(t.gladys.fake.connectionStatus.connected, true);
+  await t.app.stop();
+});
+
+test('a refused login: no read even when one is asked directly; the time of a read in /data before it', async () => {
+  const t = await setup({ config: { ...TRUSTED, password: 'wrong' } });
+  await t.start();
+  const logins = t.meter.count(PATHS.LOGIN);
+  t.clock.now += HOUR;
+  await t.app.tick();
+  assert.equal(t.meter.count(PATHS.LOGIN), logins, 'read() checks the refusal too');
+  await t.app.stop();
+  // Pinned already (a typed fingerprint would save /data in checkPeer anyway).
+  const u = await setup({
+    config: CONFIG,
+    store: createMemoryStore({ pins: { '192.168.1.30:443': FP } }),
+  });
+  let kept;
+  u.meter.hook = (path) => {
+    if (path === PATHS.SERIAL && kept === undefined) kept = u.store.data.lastAttemptAt;
+    return undefined;
+  };
+  await u.start();
+  assert.equal(kept, NOW, 'lastAttemptAt written before the first request');
+  await u.app.stop();
+});
+
+test('every start forgets the states Gladys was sent (a restarted Gladys gets them again)', async () => {
+  const t = await setup();
+  let forgotten = 0;
+  const original = t.gladys.forgetPublishedStates?.bind(t.gladys);
+  t.gladys.forgetPublishedStates = () => {
+    forgotten += 1;
+    return original?.();
+  };
+  await t.start();
+  await t.app.configUpdated(TRUSTED);
+  assert.equal(forgotten, 2);
+  await t.app.stop();
+});
+
+test('a small drop of a "+" register is held (only a net register may dip)', async () => {
+  const t = await setup({ devices: [created(SOLAR_PLUS)] });
+  await t.start();
+  t.meter.reg('Solar+').cumul -= ws(0.05);
+  await t.wait(INDEX_INTERVAL);
+  assert.equal(t.app.heldList().length, 1);
+  await t.app.stop();
+});
+
+test('values outside the declared bounds are not published', async () => {
+  const t = await setup({ devices: [created(GRID), created('reg-6-temperature')] });
+  t.meter.reg('Grid').rate = 1e9;
+  t.meter.reg('Attic').rate = 5000;
+  await t.start();
+  assert.deepEqual(t.statesOf(GRID, 'power'), []);
+  assert.deepEqual(t.statesOf('reg-6-temperature', 'temperature'), []);
+  t.meter.reg('Attic').rate = 20;
+  await t.wait(POLL_INTERVAL);
+  assert.deepEqual(t.statesOf('reg-6-temperature', 'temperature'), [20]);
+  await t.app.stop();
+});
+
+test('a listed register that counts nothing is said', async () => {
+  const t = await setup({
+    config: { ...TRUSTED, consumption_registers: 'use, L1 Voltage', production_registers: 'Grid' },
+  });
+  t.meter.reg('Grid').cumul = -ws(10);
+  await t.start();
+  assert.match(text(t.gladys.fake.connectionStatus), /counted nowhere[^.]*"L1 Voltage", "Grid"/);
+  await t.app.stop();
+});
+
+test('300 registers: at most 250 states a minute; badges in calls of 100, tried again after a failure', async () => {
+  const meter = (await setup({ connect: false })).meter;
+  meter.regs = Array.from({ length: 300 }, (_, i) => ({
+    name: `C${i}`,
+    type: 'P',
+    idx: i,
+    did: i,
+    rate: 100 + i,
+    cumul: ws(1000 + i),
+  }));
+  const devices = meter.regs.map((r) => created(`reg-${r.did}-power`, { keys: ['power'] }));
+  const t = await setup({ devices, meter });
+  let fail = true;
+  const publish = t.gladys.publishTransports.bind(t.gladys);
+  const calls = [];
+  t.gladys.publishTransports = async (list) => {
+    calls.push(list.length);
+    if (fail) {
+      fail = false;
+      throw new Error('down');
+    }
+    return publish(list);
+  };
+  await t.start();
+  const powers = () =>
+    t.gladys.fake.states.filter((s) => s.device_feature_external_id.endsWith(':power')).length;
+  assert.ok(powers() <= 250, `${powers()} states`);
+  assert.ok(calls.every((n) => n <= 100));
+  for (const r of meter.regs) r.rate += 1;
+  await t.wait(POLL_INTERVAL);
+  assert.ok(powers() <= 250, 'nothing more within the minute');
+  // The budget counts a minute and a margin (65 s): the read at 90 s sends again.
+  await t.wait(2 * POLL_INTERVAL);
+  assert.ok(powers() > 250);
+  assert.equal(new Set(t.gladys.fake.transports.map((b) => b.device_external_id)).size, 300);
+  await t.app.stop();
 });

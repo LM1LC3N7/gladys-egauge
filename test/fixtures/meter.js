@@ -65,6 +65,8 @@ export function createMeter({
     username,
     password,
     serial: SERIAL,
+    /** The account has the `view_settings` privilege (it may read /api/sys/sn). */
+    viewSettings: true,
     fingerprint: FP,
     regs: registers(),
     rowAt: undefined,
@@ -146,8 +148,11 @@ export function createMeter({
     }
     const bearer = /^Bearer (.+)$/.exec(String(headers.authorization ?? ''))?.[1];
     if (!bearer || !meter.tokens.has(bearer)) return challenge();
-    if (path === '/api/sys/sn' && method === 'GET')
+    if (path === '/api/sys/sn' && method === 'GET') {
+      // `/sys` needs the `view_settings` privilege (WebAPI).
+      if (!meter.viewSettings) return json(403, { error: 'Insufficient privileges.' }, date);
       return json(200, { result: meter.serial }, date);
+    }
     if (path === '/api/register?raw&rate&virtual=value&time=now' && method === 'GET') {
       return json(200, meter.registerAnswer(), date);
     }

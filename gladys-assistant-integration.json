@@ -49,8 +49,8 @@
       "required": true,
       "label": { "en": "User name", "fr": "Nom d'utilisateur" },
       "description": {
-        "en": "An account of the meter, as in its web interface (Settings > Access Control). An account that may only view the data is enough.",
-        "fr": "Un compte du compteur, comme dans son interface web (Settings > Access Control). Un compte qui peut seulement voir les données suffit."
+        "en": "An account of the meter, as in its web interface (Settings > Access Control). An account that may only view the data is enough (without the \"View settings\" right, the meter is identified by its certificate).",
+        "fr": "Un compte du compteur, comme dans son interface web (Settings > Access Control). Un compte qui peut seulement voir les données suffit (sans le droit « View settings », le compteur est identifié par son certificat)."
       },
       "placeholder": { "en": "e.g. gladys-reader", "fr": "ex. lecteur-gladys" }
     },
