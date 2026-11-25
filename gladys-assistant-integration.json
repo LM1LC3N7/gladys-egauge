@@ -1,177 +1,139 @@
 {
   "manifest_version": 1,
   "type": "device",
-  "name": "Demo Devices Template",
+  "name": "eGauge",
   "description": {
-    "en": "Starter template showing sensors, a switch, a dimmable light and a smart plug.",
-    "fr": "Template de démarrage : capteurs, interrupteur, lampe variable et prise connectée."
+    "en": "Unofficial: eGauge energy meters on your network: power and energy of every register.",
+    "fr": "Non officiel : compteurs d'énergie eGauge en local : puissance et énergie par registre."
   },
-  "version": "1.0.0",
-  "docker_image": "ghcr.io/gladysassistant/integration-template-js:1.0.0",
+  "version": "0.1.0",
+  "docker_image": "ghcr.io/lm1lc3n7/gladys-egauge:0.1.0",
   "gladys_version": ">=5.1.0",
-  "cover_image": "https://raw.githubusercontent.com/GladysAssistant/integration-template-js/master/cover.png",
-  "categories": ["lighting", "security", "environment"],
-  "transports": ["local", "cloud"],
+  "cover_image": "https://raw.githubusercontent.com/LM1LC3N7/gladys-egauge/main/cover.png",
+  "categories": ["energy"],
+  "transports": ["local"],
   "config_schema": [
     {
       "key": "intro",
       "type": "section",
-      "label": { "en": "Getting started", "fr": "Pour commencer" },
+      "label": { "en": "eGauge meter", "fr": "Compteur eGauge" },
       "description": {
-        "en": "The demo weather station reads real data from the free Open-Meteo API: pick the coordinates to observe. No account, no API key.",
-        "fr": "La station météo de démonstration lit de vraies données via l'API gratuite Open-Meteo : choisissez les coordonnées à observer. Pas de compte, pas de clé d'API."
+        "en": "Unofficial connector, not affiliated with eGauge Systems. It reads an eGauge energy meter (EG4xxx, EG30xx with a firmware that offers the WebAPI) through its official WebAPI, over HTTPS on your network, without any cloud: the power of every register (circuits, solar, grid), its voltage, current, frequency or temperature, and the energy of the registers you choose for the Gladys energy monitoring. Read-only: the meter is never commanded nor configured. Never tested with a real eGauge meter.",
+        "fr": "Connecteur non officiel, sans lien avec eGauge Systems. Il lit un compteur d'énergie eGauge (EG4xxx, EG30xx avec un firmware qui offre la WebAPI) par sa WebAPI officielle, en HTTPS sur votre réseau, sans cloud : la puissance de chaque registre (circuits, solaire, réseau), sa tension, son courant, sa fréquence ou sa température, et l'énergie des registres que vous choisissez pour le suivi énergétique de Gladys. Lecture seule : le compteur n'est jamais commandé ni configuré. Jamais testé avec un vrai compteur eGauge."
       },
       "links": [
         {
-          "url": "https://open-meteo.com/en/docs",
-          "label": { "en": "Open-Meteo documentation", "fr": "Documentation Open-Meteo" }
+          "url": "https://github.com/LM1LC3N7/gladys-egauge/blob/main/docs/fr.md",
+          "label": { "en": "Guide (French)", "fr": "Guide (français)" }
+        },
+        {
+          "url": "https://github.com/LM1LC3N7/gladys-egauge/blob/main/docs/en.md",
+          "label": { "en": "Guide (English)", "fr": "Guide (anglais)" }
         }
       ]
     },
     {
-      "key": "latitude",
-      "type": "number",
-      "label": { "en": "Latitude", "fr": "Latitude" },
-      "description": {
-        "en": "Latitude used for the demo weather sensor.",
-        "fr": "Latitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 48.8566", "fr": "ex. 48.8566" },
+      "key": "address",
+      "type": "string",
       "required": true,
-      "default": 48.8566,
-      "min": -90,
-      "max": 90
+      "label": { "en": "Meter address", "fr": "Adresse du compteur" },
+      "description": {
+        "en": "The IP address (or local host name) of the meter on your home network, with a port only if it is not 443. Preferably give it a fixed address.",
+        "fr": "L'adresse IP (ou le nom d'hôte local) du compteur sur votre réseau domestique, avec un port seulement s'il n'est pas 443. Donnez-lui de préférence une adresse fixe."
+      },
+      "placeholder": { "en": "e.g. 192.168.1.30", "fr": "ex. 192.168.1.30" }
     },
     {
-      "key": "longitude",
-      "type": "number",
-      "label": { "en": "Longitude", "fr": "Longitude" },
-      "description": {
-        "en": "Longitude used for the demo weather sensor.",
-        "fr": "Longitude utilisée par le capteur météo de démonstration."
-      },
-      "placeholder": { "en": "e.g. 2.3522", "fr": "ex. 2.3522" },
+      "key": "username",
+      "type": "string",
       "required": true,
-      "default": 2.3522,
-      "min": -180,
-      "max": 180
-    },
-    {
-      "key": "unit",
-      "type": "select",
-      "label": { "en": "Temperature unit", "fr": "Unité de température" },
-      "required": false,
-      "default": "celsius",
-      "options": [
-        { "value": "celsius", "label": { "en": "Celsius", "fr": "Celsius" } },
-        { "value": "fahrenheit", "label": { "en": "Fahrenheit", "fr": "Fahrenheit" } }
-      ]
-    },
-    {
-      "key": "poll_frequency",
-      "type": "number",
-      "label": { "en": "Refresh interval (s)", "fr": "Intervalle de rafraîchissement (s)" },
+      "label": { "en": "User name", "fr": "Nom d'utilisateur" },
       "description": {
-        "en": "How often sensors are polled, in seconds (one minute minimum).",
-        "fr": "Fréquence d'interrogation des capteurs, en secondes (une minute minimum)."
+        "en": "An account of the meter, as in its web interface (Settings > Access Control). An account that may only view the data is enough.",
+        "fr": "Un compte du compteur, comme dans son interface web (Settings > Access Control). Un compte qui peut seulement voir les données suffit."
       },
+      "placeholder": { "en": "e.g. gladys-reader", "fr": "ex. lecteur-gladys" }
+    },
+    {
+      "key": "password",
+      "type": "secret",
+      "required": true,
+      "label": { "en": "Password", "fr": "Mot de passe" },
+      "description": {
+        "en": "The password of that account. Kept by Gladys in its database, never shown again, used only to sign in to the meter above: the integration proves it knows it (digest login of the WebAPI) without ever sending it; never logged.",
+        "fr": "Le mot de passe de ce compte. Gardé par Gladys dans sa base, jamais réaffiché, utilisé seulement pour se connecter au compteur ci-dessus : l'intégration prouve qu'elle le connaît (connexion par condensé de la WebAPI) sans jamais l'envoyer ; jamais écrit dans les journaux."
+      }
+    },
+    {
+      "key": "certificate_fingerprint",
+      "type": "string",
       "required": false,
-      "default": 300,
-      "min": 60,
-      "max": 3600
+      "label": {
+        "en": "Certificate fingerprint (optional)",
+        "fr": "Empreinte du certificat (facultatif)"
+      },
+      "description": {
+        "en": "The meter shows a self-signed certificate: nothing is sent to it until you confirm it. Leave empty and use the \"Trust the certificate\" button, or copy here the SHA-256 fingerprint the status shows (after checking it in your browser) and save.",
+        "fr": "Le compteur présente un certificat auto-signé : rien ne lui est envoyé tant que vous ne l'avez pas confirmé. Laissez vide et utilisez le bouton « Faire confiance au certificat », ou copiez ici l'empreinte SHA-256 affichée par le statut (après l'avoir vérifiée dans votre navigateur) et enregistrez."
+      },
+      "placeholder": { "en": "e.g. AB:CD:EF:...", "fr": "ex. AB:CD:EF:..." }
+    },
+    {
+      "key": "consumption_registers",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en": "Registers counted as consumption (optional)",
+        "fr": "Registres comptés en consommation (facultatif)"
+      },
+      "description": {
+        "en": "Exact register names, separated by commas, whose energy goes into the Gladys energy monitoring as consumption (an energy index). Typically the total use of the home (a virtual register often named \"use\") or a circuit. Leave empty: their power is still shown.",
+        "fr": "Noms exacts de registres, séparés par des virgules, dont l'énergie entre dans le suivi énergétique de Gladys en consommation (un index d'énergie). Typiquement la consommation totale de la maison (un registre virtuel souvent nommé « use ») ou un circuit. Laissez vide : leur puissance reste affichée."
+      },
+      "placeholder": { "en": "e.g. use, Heat pump", "fr": "ex. use, Pompe à chaleur" }
+    },
+    {
+      "key": "production_registers",
+      "type": "string",
+      "required": false,
+      "label": {
+        "en": "Registers counted as production (optional)",
+        "fr": "Registres comptés en production (facultatif)"
+      },
+      "description": {
+        "en": "Exact register names, separated by commas, whose energy goes into the Gladys energy monitoring as production (typically the solar register, often \"gen\" or \"Solar+\"). A register is in one list at most.",
+        "fr": "Noms exacts de registres, séparés par des virgules, dont l'énergie entre dans le suivi énergétique de Gladys en production (typiquement le registre solaire, souvent « gen » ou « Solar+ »). Un registre figure dans une liste au plus."
+      },
+      "placeholder": { "en": "e.g. gen", "fr": "ex. gen" }
     }
   ],
   "actions": [
     {
-      "key": "test_weather",
-      "label": { "en": "Test the weather provider", "fr": "Tester le fournisseur météo" },
-      "timeout_seconds": 30
+      "key": "test_connection",
+      "timeout_seconds": 30,
+      "label": { "en": "Test the connection", "fr": "Tester la connexion" },
+      "description": {
+        "en": "Reads the meter once when a read is due (never more than one every 30 seconds), otherwise tells the last read. After a refused login, it tries once more.",
+        "fr": "Lit le compteur une fois quand une lecture est due (jamais plus d'une toutes les 30 secondes), sinon donne la dernière lecture. Après une connexion refusée, il réessaie une fois."
+      }
     },
     {
-      "key": "identify",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ]
-    }
-  ],
-  "scene_triggers": [
-    {
-      "key": "motion_detected",
-      "label": { "en": "Motion detected", "fr": "Mouvement détecté" },
+      "key": "trust_certificate",
+      "timeout_seconds": 30,
+      "label": { "en": "Trust the certificate", "fr": "Faire confiance au certificat" },
       "description": {
-        "en": "A demo motion sensor saw a person or an animal move.",
-        "fr": "Un détecteur de démonstration a vu bouger une personne ou un animal."
-      },
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Sensor", "fr": "Détecteur" }
-        },
-        {
-          "key": "target",
-          "type": "multi_select",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" },
-          "options": [
-            { "value": "person", "label": { "en": "Person", "fr": "Personne" } },
-            { "value": "animal", "label": { "en": "Animal", "fr": "Animal" } }
-          ]
-        }
-      ],
-      "variables": [
-        {
-          "key": "target",
-          "type": "string",
-          "label": { "en": "What moved", "fr": "Ce qui a bougé" }
-        }
-      ]
-    }
-  ],
-  "scene_actions": [
+        "en": "Two clicks: the first reads the certificate the meter shows now (a TLS handshake, nothing sent) and gives its fingerprint, to compare with the one your browser shows; the second, 3 seconds to 5 minutes later, trusts it if the meter still shows the same one.",
+        "fr": "Deux clics : le premier lit le certificat que le compteur présente maintenant (une négociation TLS, rien envoyé) et donne son empreinte, à comparer avec celle que montre votre navigateur ; le second, de 3 secondes à 5 minutes plus tard, lui fait confiance si le compteur présente toujours le même."
+      }
+    },
     {
-      "key": "identify_device",
-      "label": { "en": "Identify a device", "fr": "Identifier un appareil" },
+      "key": "accept_held",
+      "timeout_seconds": 30,
+      "label": { "en": "Accept the held values", "fr": "Accepter les valeurs retenues" },
       "description": {
-        "en": "Make a device signal itself (the demo light blinks).",
-        "fr": "Fait se signaler un appareil (la lampe de démonstration clignote)."
-      },
-      "timeout_seconds": 15,
-      "fields": [
-        {
-          "key": "device",
-          "type": "select",
-          "source": "devices",
-          "label": { "en": "Device", "fr": "Appareil" },
-          "required": true
-        }
-      ],
-      "outputs": [
-        {
-          "key": "signalled",
-          "type": "boolean",
-          "label": { "en": "Device signalled", "fr": "Appareil signalé" }
-        }
-      ]
-    }
-  ],
-  "widgets": [
-    {
-      "key": "demo_status",
-      "label": { "en": "Demo status", "fr": "État de la démo" },
-      "description": {
-        "en": "Live temperature and plug power, plug connection and observed location.",
-        "fr": "Température et puissance en direct, connexion de la prise, position observée."
-      },
-      "icon": "activity",
-      "action_timeout_seconds": 15
+        "en": "Only when the status shows a lifetime counter held back (a jump or a drop) or another meter at the address, and it is right. Two clicks: the first lists what is held and takes nothing; the second, 3 seconds to 5 minutes later, takes exactly what was listed (plus what may be measured between the clicks) when it has not changed otherwise. Saving the configuration never accepts.",
+        "fr": "Seulement quand l'état affiche un compteur cumulé retenu (saut ou baisse) ou un autre compteur à l'adresse, et que c'est juste. Deux clics : le premier liste ce qui est retenu et ne prend rien ; le second, de 3 secondes à 5 minutes plus tard, prend exactement ce qui a été listé (plus ce qui a pu être mesuré entre les clics) si cela n'a pas changé autrement. Enregistrer la configuration n'accepte jamais."
+      }
     }
   ]
 }

@@ -8,77 +8,103 @@ contributors.
 A Gladys Assistant **external integration**: a Node.js service (Node 22+, ESM,
 no build step) that runs in its own sandboxed Docker container and talks to
 Gladys through
-[`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js),
-its only runtime dependency. It started from the official JavaScript template.
+[`@gladysassistant/integration-sdk`](https://github.com/GladysAssistant/integration-sdk-js).
+Its only runtime dependency is the SDK. It started from the official
+JavaScript template.
+
+It reads an **eGauge energy meter** through its official local **WebAPI**
+(HTTPS, webapi.egauge.net): the digest login (`/api/auth/unauthorized`,
+`/api/auth/login`), then `/api/sys/sn` and `/api/register` with the JWT.
+Logic ported from egauge-python (MIT, eGauge Systems LLC), see
+`THIRD_PARTY_NOTICES.md`. Unofficial. Sibling: `gladys-sunpower-pvs`
+(structure, app, store, guard, HTTPS transport).
 
 ## Commands
 
 ```bash
 npm install
 npm test                                  # node --test, the built-in runner
-node --test test/devices.test.js          # one file
-node --test --test-name-pattern "plug"    # tests whose name matches
+node --test test/app.test.js              # one file
+node --test --test-name-pattern "trust"   # tests whose name matches
+npm run audit                             # npm audit --omit=dev
 npm run lint                              # ESLint
 npm run format:check                      # Prettier, as the CI runs it
-npm run format                            # Prettier, fix in place
-npx github:GladysAssistant/integration-store .   # store admission checks
+node scripts/cover.mjs cover.png          # the store cover (800×534)
 ```
-
-The CI (`.github/workflows/ci.yml`) runs `format:check`, `lint` and `test` on
-Node 22 and 24, and builds the Docker image: run the three commands before
-pushing.
 
 ## Architecture
 
 ```
-index.js                          SDK wiring only: handlers registered before connect()
-src/devices/index.js              registry of the device blueprints + dispatch helpers
-src/devices/<type>.js             one device type per file (buildDevice, onPoll, onSetValue...)
-src/scenes.js                     scene action handlers (manifest `scene_actions`)
-src/widgets.js                    dashboard widget handlers (manifest `widgets`)
-src/config.js                     DEFAULT_CONFIG (mirrors the manifest defaults) + normalization
-src/weather.js                    example driver (Open-Meteo)
-gladys-assistant-integration.json manifest: name, config_schema, actions, image...
-docs/en.md, docs/fr.md            user documentation, re-hosted by Gladys (mandatory)
-test/                             node --test, against the SDK's fake Gladys (integration-sdk/testing)
-.github/scripts/release.mjs       release helpers (manifest bump, changelog), tested in test/
+index.js                     SDK wiring only: handlers registered before connect()
+src/app.js                   EgaugeApp: getConfig retries, the pace, the certificate, the identity, the guards, /data, buttons
+src/egauge/http.js           the only network access (HTTPS, fingerprint checked before any byte, bounded; the TLS probe)
+src/egauge/client.js         the WebAPI: digest login, token, /api/sys/sn, /api/register
+src/egauge/model.js          the answers -> values, strict (pure)
+src/egauge/errors.js         our error codes (messages safe to log)
+src/guard.js                 plausibility of a lifetime counter (shared file, pure)
+src/store.js                 what /data keeps across restarts (unreadable is not empty)
+src/devices.js               the devices, feature keys, external ids, states (pure)
+src/config.js                the address, the account, the fingerprint, the lists, normalized
+src/constants.js             paths, pacing, limits, manifest keys
+src/i18n.js                  runtime texts (en/fr)
+scripts/cover.mjs            the cover image
+test/fixtures/meter.js       the fake meter (transport level)
+test/helpers/server.js       the fake meter behind a real HTTPS server; a TLS impostor
 ```
 
 ## Rules
 
-- **External ids are forever.** Build them with
-  `gladys.externalIds(type, platformId)`, `platformId` being the unique id the
-  platform gives the device (serial, cloud id, MAC), never a label. Gladys keys
-  devices, their history, scenes and dashboards on them: changing one creates a
-  new device and orphans the old one. The same goes for every key users store:
-  manifest `config_schema`, `actions`, widget and scene keys, feature keys.
-- **Every feature carries `name`, `min`, `max`, `read_only` and
-  `has_feedback`**, even where they mean nothing: Gladys stores them NOT NULL.
-  `min`/`max` are `0`/`1` for a binary feature, the real range for a numeric
-  one, `0`/`0` for a feature without a range (text, image...). A missing one
-  can pass the publication on a core that does not check it, then fail when
-  the user clicks "Add" (HTTP 422 `t_device_feature.min cannot be null`). The
-  SDK's fake Gladys refuses it on publication, and `test/devices.test.js`
-  checks them.
-- **The container rootfs is read-only.** Write only under `/data`, the one
-  writable volume. Never log tokens, passwords or API keys.
-- **Versions belong to the Release workflow** (Actions → Release). Never edit
-  `version` in `package.json` or in the manifest, nor the `docker_image` tag,
-  by hand — except on the README's hand-pushed tag path, which bumps all three
-  together before tagging. `test/manifest.test.js` checks they agree.
-- **Changelog.** Every user-visible change adds a line under `## [Unreleased]`
-  in `CHANGELOG.md` (`### Added`, `Changed`, `Fixed`, `Removed`, `Security`).
-  Never write a version heading: the Release workflow moves the section, and it
-  becomes the notes of the GitHub Release.
-- **Manifest.** Texts are multi-language objects `{ "en": ..., "fr": ... }`:
-  `label`, `description` and `placeholder` alike, never a plain string. The
-  catalog `description` holds 10 to 100 characters per language. A field the
-  older cores do not know needs a higher `gladys_version` minimum
-  (`categories`: 4.86.0; `widgets`, `scene_triggers`, `scene_actions`,
-  `type: "provider"`: 5.1.0). `test/manifest.test.js` ties the manifest to the
-  code (defaults, action, scene and widget handlers): change both sides
-  together.
-- **User-facing text** is bilingual (English and French): action messages,
-  manifest texts, and `docs/en.md` / `docs/fr.md`, kept in sync.
-- **Style.** Prettier formats, ESLint catches mistakes. Comments explain why,
-  in English. Tests never touch the network.
+- **Read-only**: only the four `PATHS` of `src/constants.js`; `/api/cmd` and
+  `/api/config` are never called (a test scans the sources). One POST: the
+  login.
+- **Certificate**: nothing is written to the meter before its certificate
+  is the fingerprint typed or the one the user trusted ("Trust the
+  certificate", two clicks, each a handshake that writes nothing). Never
+  learned on first use, never learned again by itself.
+  `rejectUnauthorized: false` only in the options of a request to the meter.
+- **Secrets**: the user name, the password and the token live in private
+  fields of `EgaugeClient`; the password is never sent (digest). Never in a
+  log, an error, a status, /data, an id or a name. The serial number is kept
+  as a salted HMAC only. Never the forbidden word for secrets
+  (`test/encoding.test.js`).
+- **Energy**: indexes (`energy-sensor` / `index`,
+  `energy-production-sensor` / `index`, with their 30-minute features
+  declared, UUID v5 ids) only for the registers the user lists. Every
+  lifetime counter passes `IndexGuard` (`src/guard.js`) on the session
+  clock: never 0, a drop and a jump never confirmed by time, taken only by
+  `accept_held` in two clicks. Do not change `src/guard.js` without the same
+  change in its siblings and a review.
+- **Units**: only the core's (`DEVICE_FEATURE_UNITS_BY_CATEGORY`).
+- **Strict values**: a cumulative value is a decimal integer string (BigInt,
+  64 bits), anything else is unknown, never 0.
+- **The pace**: never two reads less than 30 s apart, whatever asks; the
+  time of the last read is in /data before the request.
+- **Identity**: the serial number of every read against /data; another one:
+  nothing published until `accept_held`; unreadable: nothing published from
+  that read.
+- **Freshness**: a row is published once (its time in /data), never when it
+  is more than 2 h older than the Date header of the meter.
+- **Late answers**: every await in a read is followed by `gone()`.
+- **`/data`**: an unreadable file is not an empty state: never overwritten,
+  no counter published; a save that fails holds the counters back.
+- **getConfig** in `connected` is retried without end (5 s doubled to 5 min).
+- **At most 250 states a minute** (`budget`).
+- **External ids are forever**: `reg-<did>-<kind>`, `virt-<hash>-<kind>`,
+  the `FEATURE` keys of `src/devices.js`, the manifest keys and actions.
+  Features only grow.
+- **The container rootfs is read-only.** Write only `/data/egauge-state.json`.
+- **Versions belong to the Release workflow** (Actions → Release), except the
+  first 0.1.0 set by hand. `test/manifest.test.js` checks they agree; the
+  User-Agent carries the version too.
+- **Changelog**: every user-visible change under `## [Unreleased]`.
+- **Manifest**: texts `{ en, fr }`; never a `default` on a secret.
+- **Style**: Prettier, ESLint; comments explain why, in English. Tests never
+  touch the network (the HTTPS tests use 127.0.0.1); `mkdtemp` folders are
+  removed in `t.after`.
+
+## CI and pushes
+
+- Group the commits and push **at most once a day**, unless the maintainer
+  explicitly asks otherwise: the GitHub Actions quota is limited.
+- If every CI job fails in under 2 seconds, the quota is exhausted: it is not
+  a bug in the code.

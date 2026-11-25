@@ -1,0 +1,146 @@
+[
+  {
+    "name": "certificate learned on first use",
+    "file": "src/app.js",
+    "from": "    if (!pin) {\n      throw new EgaugeError(CODES.CERTIFICATE_UNCONFIRMED",
+    "to": "    if (false) {\n      throw new EgaugeError(CODES.CERTIFICATE_UNCONFIRMED"
+  },
+  {
+    "name": "another certificate accepted",
+    "file": "src/app.js",
+    "from": "    if (fingerprint !== pin) {",
+    "to": "    if (false) {"
+  },
+  {
+    "name": "another certificate than the typed one accepted",
+    "file": "src/app.js",
+    "from": "      if (fingerprint !== typed) {",
+    "to": "      if (false) {"
+  },
+  {
+    "name": "trust: the second click takes another fingerprint",
+    "file": "src/app.js",
+    "from": "    if (pending.fingerprint !== fingerprint) return T.trust.different(fingerprint);",
+    "to": ""
+  },
+  {
+    "name": "trust: a second click right after the first",
+    "file": "src/app.js",
+    "from": "      elapsed > CONFIRM_WITHIN ||\n      elapsed < CONFIRM_AFTER\n    ) {\n      this.pendingTrust",
+    "to": "      elapsed > CONFIRM_WITHIN\n    ) {\n      this.pendingTrust"
+  },
+  {
+    "name": "trust with /data unreadable",
+    "file": "src/app.js",
+    "from": "    if (this.storeError) return T.trust.storeUnreadable;",
+    "to": ""
+  },
+  {
+    "name": "an answer before the request read",
+    "file": "src/egauge/http.js",
+    "from": "        if (early) throw new EgaugeError(CODES.BAD_ANSWER, 'Answer before the request');",
+    "to": ""
+  },
+  {
+    "name": "no size cap",
+    "file": "src/egauge/http.js",
+    "from": "          if (size > maxBytes) {",
+    "to": "          if (false) {"
+  },
+  {
+    "name": "no new nonce after an expired one",
+    "file": "src/egauge/client.js",
+    "from": "attempt < 2;",
+    "to": "attempt < 1;"
+  },
+  {
+    "name": "an expired nonce taken as a refusal",
+    "file": "src/egauge/model.js",
+    "from": "/nonce/i.test(json.error)",
+    "to": "false"
+  },
+  {
+    "name": "token used forever",
+    "file": "src/egauge/client.js",
+    "from": "age >= 0 && age < TOKEN_MAX_AGE",
+    "to": "age >= 0"
+  },
+  {
+    "name": "row not matched to the registers",
+    "file": "src/egauge/model.js",
+    "from": "  if (row.length !== list.length) {",
+    "to": "  if (false) {"
+  },
+  {
+    "name": "a refused login tried again by itself",
+    "file": "src/app.js",
+    "from": "    if (!this.running || !this.session?.client || this.refusedApplies()) return;",
+    "to": "    if (!this.running || !this.session?.client) return;"
+  },
+  {
+    "name": "another meter taken as the same",
+    "file": "src/app.js",
+    "from": "    if (m.identity === seen) {",
+    "to": "    if (true) {"
+  },
+  {
+    "name": "a stale row published",
+    "file": "src/app.js",
+    "from": "return Math.abs(clock - at) <= STALE_AFTER;",
+    "to": "return true;"
+  },
+  {
+    "name": "counters sent when /data was not saved",
+    "file": "src/app.js",
+    "from": "if (saved && !this.storeError) states",
+    "to": "if (true) states"
+  },
+  {
+    "name": "reads faster than the interval",
+    "file": "src/app.js",
+    "from": "this.lastReadAt + POLL_INTERVAL",
+    "to": "this.lastReadAt + 1000"
+  },
+  {
+    "name": "any drop of a net register ignored",
+    "file": "src/app.js",
+    "from": "      last - value <= NET_DROP_SLACK_KWH",
+    "to": "      true"
+  },
+  {
+    "name": "getConfig not tried again",
+    "file": "src/app.js",
+    "from": "      this.configTimer = this.timers.setTimeout(() => {",
+    "to": "      this.configTimer = undefined && this.timers.setTimeout(() => {"
+  },
+  {
+    "name": "a lifetime counter for a net register not listed",
+    "file": "src/devices.js",
+    "from": "  if (entry.plainCounter && sample.accumulation === 'net') return false;",
+    "to": ""
+  },
+  {
+    "name": "the sign of a '-' register not turned",
+    "file": "src/devices.js",
+    "from": "(cumul * BigInt(sign)) / 3600n",
+    "to": "cumul / 3600n"
+  },
+  {
+    "name": "production power below 0",
+    "file": "src/devices.js",
+    "from": "value = Math.max(entry.floor, value);",
+    "to": "value = value + 0;"
+  },
+  {
+    "name": "an empty password sent",
+    "file": "src/config.js",
+    "from": "passwordInvalid: password === '' ||",
+    "to": "passwordInvalid:"
+  },
+  {
+    "name": "a counter at 0 published",
+    "file": "src/guard.js",
+    "from": "if (!Number.isFinite(value) || value <= 0) {",
+    "to": "if (!Number.isFinite(value) || value < 0) {"
+  }
+]

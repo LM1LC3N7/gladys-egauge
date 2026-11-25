@@ -12,53 +12,17 @@ the notes of the version's GitHub Release.
 
 ### Added
 
-- A working example of scene triggers, scene actions and dashboard widgets
-  (Gladys 5.1.0 or later).
-- `CHANGELOG.md`, rolled by the Release workflow.
-- A GitHub Release for every version, with its changelog section as notes: the
-  Gladys Supervision page links each version to the repository's releases.
-- CI runs the tests on Node 22 and 24, and builds the Docker image.
-- Dependabot keeps the npm dependencies and the GitHub Actions up to date.
-- `SECURITY.md` (how to report a vulnerability) and `CLAUDE.md` (project rules
-  for contributors and coding assistants).
-- Manifest tests: `version` matches `package.json`, `docker_image` is tagged
-  with it, descriptions hold 10 to 100 characters, placeholders are
-  multi-language objects.
-- The latitude and longitude fields show an example value as placeholder.
-
-### Changed
-
-- Node.js 22 or later is required (Node 20 is end-of-life).
-- Integration SDK 0.16.1. The tests now run against the fake Gladys of the
-  SDK, which refuses the payloads Gladys refuses, including a device feature
-  missing `name`, `min`, `max`, `read_only` or `has_feedback`. A device
-  published with a `poll_frequency` is now polled without `should_poll: true`
-  on a recent core (an explicit `should_poll: false` opts out); the template
-  keeps the field explicit for the older cores.
-- The refresh interval is one minute minimum, the fastest Gladys polls a
-  device. The plug's power is only sent when it changes, and every 30
-  minutes otherwise.
-
-### Fixed
-
-- The switch, the light, the plug, the motion sensor and the camera could not
-  be added from the Discovery tab: their on/off, motion and image features had
-  no `min`/`max`, which Gladys requires (HTTP 422 "t_device_feature.min cannot
-  be null"). A test now checks that every feature carries the columns Gladys
-  needs to create it.
-- Gladys refused the devices of the Discovery tab: the weather station and
-  the plug declared their poll frequency in seconds instead of one of the
-  values Gladys accepts, and were never polled. They now poll every minute,
-  and the readings follow the refresh interval of the configuration.
-
-- The release commit no longer fails `npm run format:check`: the Release
-  workflow updates the manifest `version` and `docker_image` in place instead
-  of re-printing the whole file with `jq`.
-- The integration can write to `/data`: the image creates the directory owned
-  by the `node` user, a new Docker volume was owned by root.
-- A sub-container running the integration's own image follows it to the new
-  tag at each release, as well as in the manifest of the build summary: it kept
-  the previous tag, which may not exist on the registry. Sub-containers on a
-  third-party image (a broker, a database...) keep theirs.
-
-[Unreleased]: https://github.com/GladysAssistant/integration-template-js/commits/main
+- eGauge energy meters through the official local WebAPI (HTTPS): one device
+  per register of type power, voltage, current, frequency or temperature,
+  read every 30 seconds.
+- Registers listed by the user counted by the Gladys energy monitoring as
+  consumption or production (index with its 30-minute feature); `+`, `-` and
+  `|` registers get a plain lifetime energy; every lifetime counter guarded
+  (never 0, drops and jumps held until accepted in two clicks).
+- The self-signed certificate confirmed by the user before anything is sent
+  ("Trust the certificate" in two clicks, or the fingerprint typed); a
+  changed certificate is never learned again by itself.
+- The digest login of the WebAPI: the password never leaves Gladys.
+- The identity of the meter (its serial number, a salted hash in `/data`)
+  checked at every read.
+- Read-only: `/api/cmd` and `/api/config` are never called.
